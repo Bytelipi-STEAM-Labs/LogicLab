@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogicLab: A Digital Puzzle Journey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #0a0a0a;
+            --color-panel: #18181b; /* zinc-900 */
+            --color-border: #3f3f46; /* zinc-700 */
+            --color-text: #a1a1aa; /* zinc-400 */
+            --color-text-strong: #f4f4f5; /* zinc-50 */
+            --color-primary: #60a5fa; /* blue-400 */
+            --color-success: #4ade80; /* green-400 */
+            --color-danger: #f87171; /* red-400 */
+            --color-warning: #facc15; /* yellow-400 */
+            --color-wire-off: #52525b; /* zinc-600 */
+            --color-wire-on: var(--color-success);
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 10px var(--color-primary), 0 0 20px var(--color-primary); }
+            50% { box-shadow: 0 0 15px var(--color-primary), 0 0 30px var(--color-primary); }
+        }
+        @keyframes modal-pop-in {
+            0% { opacity: 0; transform: scale(0.8); }
+            80% { opacity: 1; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            user-select: none;
+        }
+        .font-mono {
+            font-family: 'Roboto Mono', monospace;
+        }
+        .component {
+            cursor: grab;
+            transform-origin: center center;
+            transition: transform 0.1s ease-in-out;
+        }
+        .component.gate path {
+            transition: filter 0.2s ease;
+            filter: drop-shadow(0 0 6px var(--gate-color, transparent));
+        }
+        .component.gate:hover path {
+            filter: drop-shadow(0 0 12px var(--gate-color, transparent));
+        }
+        .component:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+        .connector {
+            cursor: crosshair;
+            transition: r 0.2s ease, fill 0.2s ease;
+        }
+        .connector:hover {
+            r: 10;
+        }
+        .connector.snap-target {
+            fill: var(--color-success);
+            stroke: #fff;
+            r: 11;
+        }
+        .wire {
+            stroke-width: 4;
+            transition: stroke 0.3s ease;
+        }
+        .wire-off { stroke: var(--color-wire-off); }
+        .wire-on {
+            stroke: var(--color-wire-on);
+            filter: drop-shadow(0 0 5px var(--color-wire-on));
+        }
+        .wire-ghost {
+            stroke: var(--color-primary);
+            stroke-width: 4;
+            stroke-dasharray: 6 6;
+            pointer-events: none;
+        }
+        .wire-ghost-invalid {
+            stroke: var(--color-danger);
+        }
+        .signal-dot {
+            fill: #fff;
+            stroke: var(--color-wire-on);
+            stroke-width: 2px;
+            filter: drop-shadow(0 0 5px #fff);
+        }
+        .input-switch-group {
+            cursor: pointer;
+        }
+        .input-switch-knob {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .input-switch-text {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            fill: white;
+            pointer-events: none;
+        }
+        .modal-backdrop {
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            animation: modal-pop-in 0.4s ease-out;
+        }
+        .fancy-button {
+            transition: all 0.2s ease-in-out;
+            border: 1px solid transparent;
+        }
+        .fancy-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        #check-button {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 10px var(--color-primary);
+            animation: pulse 2.5s infinite;
+        }
+        #check-button:hover {
+            box-shadow: 0 0 15px var(--color-primary), 0 0 30px var(--color-primary);
+        }
+        .mode-toggle {
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 999px;
+            transition: all 0.3s ease;
+            border: 1px solid var(--color-border);
+        }
+        .mode-toggle.active {
+            background-color: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 10px var(--color-primary);
+        }
+        #delete-zone.delete-active {
+            border-color: var(--color-danger);
+            background-color: rgba(248, 113, 113, 0.2);
+            transform: scale(1.1);
+        }
+        .truth-table-output {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .truth-table-output:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-zinc-900/50 border-b border-[var(--color-border)] p-3 flex justify-between items-center shadow-lg">
+        <div class="w-1/3"></div>
+        <h1 class="w-1/3 text-xl md:text-2xl font-bold text-[var(--color-text-strong)] tracking-wider text-center" style="text-shadow: 0 0 8px var(--color-primary);">
+            LogicLab
+        </h1>
+        <div class="w-1/3 flex justify-end items-center space-x-4 pr-4">
+            <button id="puzzle-mode-btn" class="mode-toggle active">Puzzle Mode</button>
+            <button id="free-mode-btn" class="mode-toggle">Free Mode</button>
+            <button id="creator-mode-btn" class="mode-toggle">Creator Mode</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col md:flex-row overflow-hidden">
+
+        <!-- Left Panel: Gates & Info -->
+        <aside class="w-full md:w-64 lg:w-72 bg-gradient-to-b from-zinc-900 to-black p-4 flex flex-col space-y-4 border-r border-[var(--color-border)] overflow-y-auto">
+            <div id="puzzle-info-panel">
+                <h2 class="text-lg font-semibold text-[var(--color-text-strong)] border-b border-[var(--color-border)] pb-2 mb-3">Level <span id="level-display">1</span></h2>
+                <div id="challenge-info" class="text-sm"></div>
+            </div>
+             <div id="mode-info-panel" class="hidden">
+                <h2 id="mode-title" class="text-lg font-semibold text-[var(--color-text-strong)] border-b border-[var(--color-border)] pb-2 mb-3"></h2>
+                <p id="mode-description" class="text-sm"></p>
+            </div>
+            <div>
+                <h2 class="text-lg font-semibold text-[var(--color-text-strong)] border-b border-[var(--color-border)] pb-2 mb-3">Components</h2>
+                <div id="component-palette" class="grid grid-cols-2 gap-4">
+                    <!-- Components will be dynamically inserted here -->
+                </div>
+            </div>
+            <div id="learn-panel-container">
+                <h2 class="text-lg font-semibold text-[var(--color-text-strong)] border-b border-[var(--color-border)] pb-2 mb-3">Learn</h2>
+                <div id="learn-panel" class="text-sm space-y-2">
+                    <!-- Learning content will be dynamically inserted here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Panel: Puzzle Canvas -->
+        <div class="flex-grow flex flex-col bg-black relative">
+            <div id="canvas-container" class="flex-grow w-full h-full">
+                <svg id="puzzle-canvas" class="w-full h-full bg-dots"></svg>
+                 <style>
+                    .bg-dots {
+                        background-image: radial-gradient(var(--color-border) 1px, transparent 0);
+                        background-size: 25px 25px;
+                    }
+                </style>
+            </div>
+            <div id="message-box" class="absolute bottom-4 left-1/2 -translate-x-1/2 p-3 rounded-lg text-white font-semibold text-center transition-all duration-300 opacity-0 scale-90"></div>
+            <div id="delete-zone" class="absolute bottom-4 right-4 w-20 h-20 bg-zinc-800 rounded-full flex items-center justify-center border-2 border-dashed border-zinc-600 transition-all duration-300 opacity-0 pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </div>
+        </div>
+
+        <!-- Right Panel: Controls -->
+        <aside id="right-panel" class="w-full md:w-72 lg:w-80 bg-gradient-to-b from-zinc-900 to-black p-4 flex flex-col border-l border-[var(--color-border)] hidden md:flex">
+            <!-- Puzzle Controls -->
+            <div id="puzzle-controls" class="flex flex-col h-full">
+                <div class="flex-grow overflow-y-auto pr-2">
+                    <h2 class="text-lg font-semibold text-[var(--color-text-strong)] border-b border-[var(--color-border)] pb-2 mb-3">Truth Table</h2>
+                    <p class="text-xs text-gray-400 mb-2">Your circuit must match these outputs.</p>
+                    <div id="truth-table-container" class="font-mono text-sm overflow-x-auto"></div>
+                </div>
+                <div class="flex-shrink-0 space-y-3 mt-4">
+                     <button id="show-solution-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md fancy-button">
+                        Show Solution
+                    </button>
+                    <button id="check-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md fancy-button">
+                        Submit Solution
+                    </button>
+                    <button id="reset-button" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-md fancy-button">
+                        Reset Level
+                    </button>
+                </div>
+            </div>
+            <!-- Free Mode Analysis -->
+            <div id="free-mode-analysis" class="hidden">
+                 <h2 class="text-lg font-semibold text-[var(--color-text-strong)] border-b border-[var(--color-border)] pb-2 mb-3">Circuit Analysis</h2>
+                 <div id="analysis-truth-table-container"></div>
+                 <div id="analysis-canonical-form" class="mt-4"></div>
+            </div>
+            <!-- Creator Mode Editor -->
+            <div id="creator-mode-editor" class="hidden">
+                 <h2 class="text-lg font-semibold text-[var(--color-text-strong)] border-b border-[var(--color-border)] pb-2 mb-3">Create a Puzzle</h2>
+                 <div class="flex items-center space-x-2 mb-2">
+                    <label for="creator-inputs" class="text-sm">Inputs:</label>
+                    <select id="creator-inputs" class="bg-zinc-700 text-white rounded p-1">
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                    </select>
+                 </div>
+                 <div id="creator-truth-table-container" class="font-mono text-sm overflow-x-auto"></div>
+                 <p class="text-xs text-gray-400 mt-2">Click the output cells to define your logic.</p>
+            </div>
+        </aside>
+
+    </main>
+    
+    <!-- Modal for Level Completion -->
+    <div id="modal" class="fixed inset-0 z-50 items-center justify-center hidden">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-8 m-4 max-w-sm w-full relative modal-content" id="modal-content-container">
+            <h3 id="modal-title" class="text-2xl font-bold text-center text-[var(--color-success)]" style="text-shadow: 0 0 10px var(--color-success);">Level Complete!</h3>
+            <p id="modal-body" class="text-center mt-4 mb-6">Excellent work! You have mastered this logic challenge.</p>
+            <button id="next-level-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md fancy-button">
+                Continue to Next Level
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM ELEMENT REFERENCES ---
+        const canvas = document.getElementById('puzzle-canvas');
+        const canvasContainer = document.getElementById('canvas-container');
+        const componentPalette = document.getElementById('component-palette');
+        const levelDisplay = document.getElementById('level-display');
+        const truthTableContainer = document.getElementById('truth-table-container');
+        const checkButton = document.getElementById('check-button');
+        const resetButton = document.getElementById('reset-button');
+        const nextLevelButton = document.getElementById('next-level-button');
+        const modal = document.getElementById('modal');
+        const modalContentContainer = document.getElementById('modal-content-container');
+        const learnPanel = document.getElementById('learn-panel');
+        const messageBox = document.getElementById('message-box');
+        const puzzleModeBtn = document.getElementById('puzzle-mode-btn');
+        const freeModeBtn = document.getElementById('free-mode-btn');
+        const creatorModeBtn = document.getElementById('creator-mode-btn');
+        const puzzleInfoPanel = document.getElementById('puzzle-info-panel');
+        const modeInfoPanel = document.getElementById('mode-info-panel');
+        const modeTitle = document.getElementById('mode-title');
+        const modeDescription = document.getElementById('mode-description');
+        const puzzleControls = document.getElementById('puzzle-controls');
+        const freeModeAnalysis = document.getElementById('free-mode-analysis');
+        const creatorModeEditor = document.getElementById('creator-mode-editor');
+        const showSolutionBtn = document.getElementById('show-solution-btn');
+        const deleteZone = document.getElementById('delete-zone');
+        const creatorInputsSelect = document.getElementById('creator-inputs');
+        const creatorTruthTableContainer = document.getElementById('creator-truth-table-container');
+        const analysisTruthTableContainer = document.getElementById('analysis-truth-table-container');
+        const analysisCanonicalForm = document.getElementById('analysis-canonical-form');
+        const learnPanelContainer = document.getElementById('learn-panel-container');
+
+        const SVG_NS = "http://www.w3.org/2000/svg";
+
+        // --- GAME STATE ---
+        let gameState = {
+            level: 1,
+            mode: 'puzzle', // 'puzzle', 'free', or 'creator'
+            currentLevelData: null,
+            placedComponents: [],
+            wires: [],
+            creatorTruthTable: [],
+            wiringState: {
+                isWiring: false,
+                sourceNode: null,
+                ghostWire: null,
+                targetNode: null,
+            },
+            dragState: {
+                isDragging: false,
+                draggedId: null,
+                offsetX: 0,
+                offsetY: 0,
+                overDeleteZone: false,
+            }
+        };
+
+        // --- COMPONENT DEFINITIONS ---
+        const GATE_DEFS = {
+            NOT: { name: 'NOT', inputs: 1, color: '#f43f5e', path: 'M 15 10 L 15 70 L 60 40 Z M 60 40 A 8 8 0 1 1 60 39.9 Z' },
+            AND: { name: 'AND', inputs: 2, color: '#3b82f6', path: 'M 15 10 H 37.5 C 67.5 10 67.5 70 37.5 70 H 15 Z' },
+            OR: { name: 'OR', inputs: 2, color: '#8b5cf6', path: 'M 15 10 Q 37.5 40 15 70 C 45 70 75 40 15 10 Z' },
+            XOR: { name: 'XOR', inputs: 2, color: '#eab308', path: 'M 7.5 10 Q 30 40 7.5 70 C 37.5 70 67.5 40 7.5 10 Z M 15 10 Q 37.5 40 15 70' },
+            NAND: { name: 'NAND', inputs: 2, color: '#10b981', path: 'M 15 10 H 37.5 C 67.5 10 67.5 70 37.5 70 H 15 Z M 67.5 40 A 8 8 0 1 1 67.5 39.9 Z' },
+            NOR: { name: 'NOR', inputs: 2, color: '#ef4444', path: 'M 15 10 Q 37.5 40 15 70 C 45 70 75 40 15 10 Z M 67.5 40 A 8 8 0 1 1 67.5 39.9 Z' },
+        };
+        
+        const GATE_INFO = {
+            NOT: "Inverts the input. If input is 1, output is 0. If input is 0, output is 1.",
+            AND: "Outputs 1 only if BOTH inputs are 1.",
+            OR: "Outputs 1 if AT LEAST ONE input is 1.",
+            XOR: "Outputs 1 only if the inputs are DIFFERENT.",
+            NAND: "Outputs 0 only if BOTH inputs are 1. It's an inverted AND.",
+            NOR: "Outputs 1 only if BOTH inputs are 0. It's an inverted OR."
+        };
+
+        // --- LEVEL GENERATION ---
+        function generateLevel(level) {
+            const levelData = {
+                inputs: [],
+                truthTable: [],
+                availableGates: [],
+                solution: null,
+                description: ""
+            };
+            const baseInstruction = "Drag and drop gates from the library to create a circuit that matches the truth table. ";
+
+            switch(level) {
+                case 1:
+                    levelData.description = baseInstruction + "The NOT gate inverts its input. Click the switch for Input A to test your circuit.";
+                    levelData.inputs = ['A'];
+                    levelData.availableGates = ['NOT'];
+                    levelData.solution = {
+                        components: [{ type: 'NOT', x: 300, y: 200, id: 'sol-not-1' }],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-not-1-in-0' },
+                            { sourceId: 'sol-not-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 2:
+                    levelData.description = baseInstruction + "The AND gate outputs 1 only when both inputs are 1. Test it with the switches!";
+                    levelData.inputs = ['A', 'B'];
+                    levelData.availableGates = ['AND'];
+                    levelData.solution = {
+                        components: [{ type: 'AND', x: 300, y: 200, id: 'sol-and-1' }],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-and-1-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-and-1-in-1' },
+                            { sourceId: 'sol-and-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 3:
+                    levelData.description = baseInstruction + "The OR gate outputs 1 if at least one input is 1.";
+                    levelData.inputs = ['A', 'B'];
+                    levelData.availableGates = ['OR', 'NOT'];
+                     levelData.solution = {
+                        components: [{ type: 'OR', x: 300, y: 200, id: 'sol-or-1' }],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-or-1-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-or-1-in-1' },
+                            { sourceId: 'sol-or-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 4:
+                    levelData.description = baseInstruction + "The XOR gate outputs 1 only when inputs differ. Can you build one?";
+                    levelData.inputs = ['A', 'B'];
+                    levelData.availableGates = ['XOR'];
+                    levelData.solution = {
+                        components: [{ type: 'XOR', x: 300, y: 200, id: 'sol-xor-1' }],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-xor-1-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-xor-1-in-1' },
+                            { sourceId: 'sol-xor-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 5:
+                    levelData.description = baseInstruction + "Combine gates to create this logic: (A AND B) OR C.";
+                    levelData.inputs = ['A', 'B', 'C'];
+                    levelData.availableGates = ['AND', 'OR'];
+                    levelData.solution = {
+                        components: [
+                            { type: 'AND', x: 250, y: 150, id: 'sol-and-1' },
+                            { type: 'OR', x: 450, y: 250, id: 'sol-or-1' }
+                        ],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-and-1-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-and-1-in-1' },
+                            { sourceId: 'level-in-2-out', destId: 'sol-or-1-in-1' },
+                            { sourceId: 'sol-and-1-out', destId: 'sol-or-1-in-0' },
+                            { sourceId: 'sol-or-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 6:
+                    levelData.description = baseInstruction + "Create the 'Sum' output of a Full Adder: S = A ⊕ B ⊕ Cin.";
+                    levelData.inputs = ['A', 'B', 'Cin'];
+                    levelData.availableGates = ['XOR', 'AND', 'OR'];
+                    levelData.solution = {
+                        components: [
+                            { type: 'XOR', x: 250, y: 150, id: 'sol-xor-1' },
+                            { type: 'XOR', x: 450, y: 250, id: 'sol-xor-2' }
+                        ],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-xor-1-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-xor-1-in-1' },
+                            { sourceId: 'level-in-2-out', destId: 'sol-xor-2-in-1' },
+                            { sourceId: 'sol-xor-1-out', destId: 'sol-xor-2-in-0' },
+                            { sourceId: 'sol-xor-2-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 7:
+                    levelData.description = baseInstruction + "Create the 'Carry Out' of a Full Adder: Cout = (A ⋅ B) + (Cin ⋅ (A ⊕ B)).";
+                    levelData.inputs = ['A', 'B', 'Cin'];
+                    levelData.availableGates = ['AND', 'OR', 'XOR'];
+                    levelData.solution = {
+                         components: [
+                            { type: 'XOR', x: 250, y: 300, id: 'sol-xor-1' },
+                            { type: 'AND', x: 450, y: 300, id: 'sol-and-1' },
+                            { type: 'AND', x: 250, y: 150, id: 'sol-and-2' },
+                            { type: 'OR', x: 600, y: 225, id: 'sol-or-1' }
+                        ],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-xor-1-in-0' },
+                            { sourceId: 'level-in-0-out', destId: 'sol-and-2-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-xor-1-in-1' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-and-2-in-1' },
+                            { sourceId: 'level-in-2-out', destId: 'sol-and-1-in-0' },
+                            { sourceId: 'sol-xor-1-out', destId: 'sol-and-1-in-1' },
+                            { sourceId: 'sol-and-1-out', destId: 'sol-or-1-in-1' },
+                            { sourceId: 'sol-and-2-out', destId: 'sol-or-1-in-0' },
+                            { sourceId: 'sol-or-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 8:
+                    levelData.description = baseInstruction + "Build a 2-to-1 Multiplexer: Out = (A ⋅ S) + (B ⋅ ¬S).";
+                    levelData.inputs = ['A', 'B', 'S'];
+                    levelData.availableGates = ['AND', 'OR', 'NOT'];
+                    levelData.solution = {
+                        components: [
+                            { type: 'NOT', x: 250, y: 350, id: 'sol-not-1' },
+                            { type: 'AND', x: 450, y: 150, id: 'sol-and-1' },
+                            { type: 'AND', x: 450, y: 300, id: 'sol-and-2' },
+                            { type: 'OR', x: 650, y: 225, id: 'sol-or-1' }
+                        ],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-and-1-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-and-2-in-0' },
+                            { sourceId: 'level-in-2-out', destId: 'sol-and-1-in-1' },
+                            { sourceId: 'sol-not-1-out', destId: 'sol-and-2-in-1' },
+                            { sourceId: 'level-in-2-out', destId: 'sol-not-1-in-0' },
+                            { sourceId: 'sol-and-1-out', destId: 'sol-or-1-in-0' },
+                            { sourceId: 'sol-and-2-out', destId: 'sol-or-1-in-1' },
+                            { sourceId: 'sol-or-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 9:
+                    levelData.description = baseInstruction + "Build a 2-to-4 Decoder. Y0 = ¬A¬B, Y1 = ¬AB, Y2 = A¬B, Y3 = AB. Connect Y0 to OUT.";
+                    levelData.inputs = ['A', 'B'];
+                    levelData.availableGates = ['AND', 'NOT'];
+                    levelData.solution = {
+                        components: [
+                            { type: 'NOT', x: 200, y: 100, id: 'sol-not-A' },
+                            { type: 'NOT', x: 200, y: 300, id: 'sol-not-B' },
+                            { type: 'AND', x: 400, y: 200, id: 'sol-and-Y0' }
+                        ],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-not-A-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-not-B-in-0' },
+                            { sourceId: 'sol-not-A-out', destId: 'sol-and-Y0-in-0' },
+                            { sourceId: 'sol-not-B-out', destId: 'sol-and-Y0-in-1' },
+                            { sourceId: 'sol-and-Y0-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                case 10:
+                    levelData.description = baseInstruction + "Build a circuit to check for even parity on 3 bits. The output should be 1 if an even number of inputs are 1.";
+                    levelData.inputs = ['A', 'B', 'C'];
+                    levelData.availableGates = ['XOR', 'NOT'];
+                    levelData.solution = {
+                        components: [
+                            { type: 'XOR', x: 250, y: 150, id: 'sol-xor-1' },
+                            { type: 'XOR', x: 450, y: 250, id: 'sol-xor-2' },
+                            { type: 'NOT', x: 650, y: 250, id: 'sol-not-1' }
+                        ],
+                        wires: [
+                            { sourceId: 'level-in-0-out', destId: 'sol-xor-1-in-0' },
+                            { sourceId: 'level-in-1-out', destId: 'sol-xor-1-in-1' },
+                            { sourceId: 'level-in-2-out', destId: 'sol-xor-2-in-1' },
+                            { sourceId: 'sol-xor-1-out', destId: 'sol-xor-2-in-0' },
+                            { sourceId: 'sol-xor-2-out', destId: 'sol-not-1-in-0' },
+                            { sourceId: 'sol-not-1-out', destId: 'level-out-0-in-0' }
+                        ]
+                    };
+                    break;
+                default: 
+                    levelData.description = "Congratulations on beating all the puzzles! More are coming soon. Feel free to use Free Mode to build your own circuits.";
+                    levelData.inputs = [' '];
+                    levelData.availableGates = [];
+                    levelData.solution = { components: [], wires: [] };
+                    break;
+            }
+
+            const numInputs = levelData.inputs.length;
+            if (levelData.inputs[0] !== ' ') {
+                const solutionCircuit = { components: levelData.solution.components, wires: levelData.solution.wires };
+                for (let i = 0; i < Math.pow(2, numInputs); i++) {
+                    const inputs = [];
+                    for (let j = numInputs - 1; j >= 0; j--) {
+                        inputs.push((i >> j) & 1);
+                    }
+                    const output = solveCircuit(solutionCircuit, inputs)[0];
+                    levelData.truthTable.push({ inputs: inputs, output: output });
+                }
+            }
+            
+            return levelData;
+        }
+
+        // --- RENDERING ---
+        function render() {
+            canvas.innerHTML = ''; 
+            renderComponents();
+            renderWires();
+            if (gameState.wiringState.isWiring && gameState.wiringState.ghostWire) {
+                canvas.appendChild(gameState.wiringState.ghostWire);
+            }
+        }
+
+        function renderComponents() {
+            if (gameState.mode === 'puzzle') {
+                renderPuzzleIO();
+            }
+            gameState.placedComponents.forEach(component => {
+                if (GATE_DEFS[component.type]) {
+                    renderGate(component);
+                } else if (component.type === 'INPUT') {
+                    renderCreatorInput(component, component.x, component.y, true);
+                } else if (component.type === 'OUTPUT') {
+                    renderCreatorOutput(component, component.x, component.y, true);
+                }
+            });
+        }
+
+        function renderGate(gate) {
+            const group = document.createElementNS(SVG_NS, 'g');
+            group.setAttribute('transform', `translate(${gate.x}, ${gate.y}) scale(1.2)`);
+            group.setAttribute('id', gate.id);
+            group.classList.add('component', 'gate');
+            
+            const gateDef = GATE_DEFS[gate.type];
+            group.style.setProperty('--gate-color', gateDef.color);
+
+            const path = document.createElementNS(SVG_NS, 'path');
+            path.setAttribute('d', gateDef.path);
+            path.setAttribute('fill', gateDef.color);
+            path.setAttribute('stroke', '#f9fafb');
+            path.setAttribute('stroke-width', 2);
+            
+            const text = document.createElementNS(SVG_NS, 'text');
+            text.textContent = gateDef.name;
+            text.setAttribute('x', 37.5);
+            text.setAttribute('y', 45);
+            text.setAttribute('fill', 'white');
+            text.setAttribute('font-size', '12px');
+            text.setAttribute('font-weight', 'bold');
+            text.setAttribute('text-anchor', 'middle');
+            text.style.pointerEvents = 'none';
+
+            group.appendChild(path);
+            group.appendChild(text);
+
+            for (let i = 0; i < gateDef.inputs; i++) {
+                const y = (80 / (gateDef.inputs + 1)) * (i + 1);
+                const connector = document.createElementNS(SVG_NS, 'circle');
+                connector.setAttribute('cx', 0);
+                connector.setAttribute('cy', y);
+                connector.setAttribute('r', 7);
+                connector.setAttribute('fill', 'var(--color-border)');
+                connector.setAttribute('stroke', 'var(--color-text)');
+                connector.setAttribute('stroke-width', 2);
+                connector.setAttribute('id', `${gate.id}-in-${i}`);
+                connector.classList.add('connector', 'input-connector');
+                group.appendChild(connector);
+            }
+
+            const outputConnector = document.createElementNS(SVG_NS, 'circle');
+            outputConnector.setAttribute('cx', 75);
+            outputConnector.setAttribute('cy', 40);
+            outputConnector.setAttribute('r', 7);
+            outputConnector.setAttribute('fill', 'var(--color-border)');
+            outputConnector.setAttribute('stroke', 'var(--color-text)');
+            outputConnector.setAttribute('stroke-width', 2);
+            outputConnector.setAttribute('id', `${gate.id}-out`);
+            outputConnector.classList.add('connector', 'output-connector');
+            group.appendChild(outputConnector);
+
+            canvas.appendChild(group);
+        }
+
+        function renderWires() {
+            const defs = document.createElementNS(SVG_NS, 'defs');
+            canvas.prepend(defs);
+
+            gameState.wires.forEach((wire, index) => {
+                const sourceElem = document.getElementById(wire.sourceId);
+                const destElem = document.getElementById(wire.destId);
+                if (!sourceElem || !destElem) return;
+
+                const sourceBbox = sourceElem.getBoundingClientRect();
+                const destBbox = destElem.getBoundingClientRect();
+                const canvasBbox = canvas.getBoundingClientRect();
+
+                const p1 = { x: sourceBbox.right - canvasBbox.left, y: sourceBbox.top + sourceBbox.height / 2 - canvasBbox.top };
+                const p2 = { x: destBbox.left - canvasBbox.left, y: destBbox.top + destBbox.height / 2 - canvasBbox.top };
+
+                const wirePath = document.createElementNS(SVG_NS, 'path');
+                const pathId = `wire-path-${index}`;
+                wirePath.setAttribute('id', pathId);
+                const pathData = `M ${p1.x} ${p1.y} C ${p1.x + 75} ${p1.y} ${p2.x - 75} ${p2.y} ${p2.x} ${p2.y}`;
+                wirePath.setAttribute('d', pathData);
+                wirePath.setAttribute('fill', 'none');
+                wirePath.setAttribute('class', `wire ${wire.value === 1 ? 'wire-on' : 'wire-off'}`);
+                canvas.appendChild(wirePath);
+
+                if (wire.value === 1) {
+                    const animPath = document.createElementNS(SVG_NS, 'path');
+                    animPath.setAttribute('id', `anim-path-${index}`);
+                    animPath.setAttribute('d', pathData);
+                    defs.appendChild(animPath);
+
+                    const dot = document.createElementNS(SVG_NS, 'circle');
+                    dot.setAttribute('r', '5');
+                    dot.classList.add('signal-dot');
+
+                    const animation = document.createElementNS(SVG_NS, 'animateMotion');
+                    animation.setAttribute('dur', '2s');
+                    animation.setAttribute('repeatCount', 'indefinite');
+                    
+                    const mpath = document.createElementNS(SVG_NS, 'mpath');
+                    mpath.setAttribute('href', `#anim-path-${index}`);
+                    
+                    animation.appendChild(mpath);
+                    dot.appendChild(animation);
+                    canvas.appendChild(dot);
+                }
+            });
+        }
+
+        function renderPuzzleIO() {
+            const levelData = gameState.currentLevelData;
+            if (!levelData || levelData.inputs[0] === ' ') return;
+
+            levelData.inputs.forEach((name, i) => {
+                const y = (canvas.clientHeight / (levelData.inputs.length + 1)) * (i + 1);
+                const component = {
+                    id: `level-in-${i}`,
+                    type: 'INPUT',
+                    value: gameState.inputValues[i],
+                    name: name
+                };
+                renderCreatorInput(component, 60, y, false);
+            });
+            
+            const yOut = canvas.clientHeight / 2;
+            const finalWire = gameState.wires.find(w => w.destId === 'level-out-0-in-0');
+            const finalValue = finalWire ? finalWire.value : 0;
+            const component = {
+                id: 'level-out-0',
+                type: 'OUTPUT',
+                value: finalValue,
+                name: 'OUT'
+            };
+            renderCreatorOutput(component, canvas.clientWidth - 100, yOut, false);
+        }
+
+        function renderCreatorInput(component, x = component.x, y = component.y, isDraggable = true) {
+            const group = document.createElementNS(SVG_NS, 'g');
+            group.setAttribute('transform', `translate(${x}, ${y})`);
+            group.setAttribute('id', component.id);
+            if (isDraggable) group.classList.add('component');
+            
+            const switchValue = component.value;
+            const switchColor = switchValue === 1 ? 'var(--color-success)' : 'var(--color-danger)';
+
+            const switchGroup = document.createElementNS(SVG_NS, 'g');
+            switchGroup.classList.add('input-switch-group');
+            switchGroup.dataset.componentId = component.id;
+
+            const track = document.createElementNS(SVG_NS, 'rect');
+            track.setAttribute('x', -30);
+            track.setAttribute('y', -15);
+            track.setAttribute('width', 60);
+            track.setAttribute('height', 30);
+            track.setAttribute('rx', 15);
+            track.setAttribute('fill', 'var(--color-panel)');
+            track.setAttribute('stroke', 'var(--color-border)');
+            track.setAttribute('stroke-width', '2');
+            
+            const knobGroup = document.createElementNS(SVG_NS, 'g');
+            knobGroup.classList.add('input-switch-knob');
+            knobGroup.style.transform = `translateX(${switchValue === 1 ? 15 : -15}px)`;
+
+            const knob = document.createElementNS(SVG_NS, 'circle');
+            knob.setAttribute('cx', 0);
+            knob.setAttribute('cy', 0);
+            knob.setAttribute('r', 12);
+            knob.setAttribute('fill', switchColor);
+            
+            const knobText = document.createElementNS(SVG_NS, 'text');
+            knobText.textContent = switchValue;
+            knobText.setAttribute('x', 0);
+            knobText.setAttribute('y', 5);
+            knobText.setAttribute('text-anchor', 'middle');
+            knobText.classList.add('input-switch-text');
+
+            knobGroup.appendChild(knob);
+            knobGroup.appendChild(knobText);
+
+            const text = document.createElementNS(SVG_NS, 'text');
+            text.textContent = component.name;
+            text.setAttribute('x', 0);
+            text.setAttribute('y', -25);
+            text.setAttribute('fill', 'white');
+            text.setAttribute('text-anchor', 'middle');
+            
+            const connector = document.createElementNS(SVG_NS, 'circle');
+            connector.setAttribute('cx', 60);
+            connector.setAttribute('cy', 0);
+            connector.setAttribute('r', 8);
+            connector.setAttribute('fill', switchColor);
+            connector.setAttribute('stroke', 'var(--color-text)');
+            connector.setAttribute('stroke-width', 2);
+            connector.setAttribute('id', `${component.id}-out`);
+            connector.classList.add('connector', 'output-connector');
+
+            switchGroup.appendChild(track);
+            switchGroup.appendChild(knobGroup);
+            group.appendChild(switchGroup);
+            group.appendChild(text);
+            group.appendChild(connector);
+            canvas.appendChild(group);
+        }
+
+        function renderCreatorOutput(component, x = component.x, y = component.y, isDraggable = true) {
+            const group = document.createElementNS(SVG_NS, 'g');
+            group.setAttribute('transform', `translate(${x}, ${y})`);
+            group.setAttribute('id', component.id);
+            if (isDraggable) group.classList.add('component');
+
+            const rectOut = document.createElementNS(SVG_NS, 'rect');
+            rectOut.setAttribute('width', 80);
+            rectOut.setAttribute('height', 40);
+            rectOut.setAttribute('rx', 5);
+            
+            const finalWire = gameState.wires.find(w => w.destId === `${component.id}-in-0`);
+            const finalValue = finalWire ? finalWire.value : 0;
+            rectOut.setAttribute('fill', finalValue === 1 ? 'var(--color-success)' : 'var(--color-danger)');
+            rectOut.setAttribute('stroke', 'var(--color-text)');
+            rectOut.setAttribute('stroke-width', '2');
+
+            const textOut = document.createElementNS(SVG_NS, 'text');
+            textOut.textContent = `${component.name}: ${finalValue}`;
+            textOut.setAttribute('x', 40);
+            textOut.setAttribute('y', 25);
+            textOut.setAttribute('fill', 'white');
+            textOut.setAttribute('text-anchor', 'middle');
+            textOut.classList.add('input-switch-text');
+
+            const connectorOut = document.createElementNS(SVG_NS, 'circle');
+            connectorOut.setAttribute('cx', -30);
+            connectorOut.setAttribute('cy', 20);
+            connectorOut.setAttribute('r', 8);
+            connectorOut.setAttribute('fill', 'var(--color-border)');
+            connectorOut.setAttribute('stroke', 'var(--color-text)');
+            connectorOut.setAttribute('stroke-width', 2);
+            connectorOut.setAttribute('id', `${component.id}-in-0`);
+            connectorOut.classList.add('connector', 'input-connector');
+
+            group.appendChild(rectOut);
+            group.appendChild(textOut);
+            group.appendChild(connectorOut);
+            canvas.appendChild(group);
+        }
+        
+        function updateUIForMode() {
+            const mode = gameState.mode;
+            puzzleInfoPanel.classList.toggle('hidden', mode !== 'puzzle');
+            modeInfoPanel.classList.toggle('hidden', mode === 'puzzle');
+            puzzleControls.classList.toggle('hidden', mode !== 'puzzle');
+            puzzleControls.classList.toggle('md:flex', mode === 'puzzle');
+            freeModeAnalysis.classList.toggle('hidden', mode !== 'free');
+            creatorModeEditor.classList.toggle('hidden', mode !== 'creator');
+            
+            puzzleModeBtn.classList.toggle('active', mode === 'puzzle');
+            freeModeBtn.classList.toggle('active', mode === 'free');
+            creatorModeBtn.classList.toggle('active', mode === 'creator');
+
+            let gatesToShow = [];
+            let creatorComps = {};
+            
+            learnPanelContainer.classList.remove('hidden');
+
+            if (mode === 'puzzle') {
+                gatesToShow = gameState.currentLevelData.availableGates;
+                updateUIForLevel();
+            } else {
+                gatesToShow = Object.keys(GATE_DEFS);
+                creatorComps = { 'INPUT': { name: 'Input' }, 'OUTPUT': { name: 'Output' } };
+                if (mode === 'free') {
+                    modeTitle.textContent = 'Free Mode';
+                    modeDescription.textContent = 'Design and test your own circuits. Drag components from the palette. The analysis panel on the right will update automatically.';
+                    learnPanel.innerHTML = 'Drag components onto the canvas to start building.';
+                } else { // Creator Mode
+                    modeTitle.textContent = 'Creator Mode';
+                    modeDescription.textContent = 'Define a truth table on the right, then build the circuit to solve your custom puzzle. Use the "Submit Solution" button to check your work.';
+                    learnPanelContainer.classList.add('hidden');
+                    checkButton.classList.remove('hidden');
+                    resetButton.textContent = 'Reset Circuit';
+                }
+            }
+            
+            componentPalette.innerHTML = '';
+            
+            gatesToShow.forEach(gateType => {
+                const gateDef = GATE_DEFS[gateType];
+                const div = document.createElement('div');
+                div.className = 'p-2 bg-zinc-800 rounded-lg flex items-center justify-center component gate';
+                div.draggable = true;
+                div.dataset.componentType = gateType;
+                div.style.setProperty('--gate-color', gateDef.color);
+                const svg = document.createElementNS(SVG_NS, 'svg');
+                svg.setAttribute('viewBox', '0 0 80 80');
+                svg.setAttribute('width', '50');
+                svg.setAttribute('height', '50');
+                const path = document.createElementNS(SVG_NS, 'path');
+                path.setAttribute('d', gateDef.path);
+                path.setAttribute('fill', gateDef.color);
+                svg.appendChild(path);
+                div.appendChild(svg);
+                componentPalette.appendChild(div);
+            });
+
+            if (mode !== 'puzzle') {
+                Object.entries(creatorComps).forEach(([type, info]) => {
+                    const div = document.createElement('div');
+                    div.className = 'p-2 bg-zinc-800 rounded-lg flex items-center justify-center component';
+                    div.draggable = true;
+                    div.dataset.componentType = type;
+                    div.textContent = info.name;
+                    div.style.color = 'white';
+                    div.style.textAlign = 'center';
+                    componentPalette.appendChild(div);
+                });
+            }
+        }
+
+        function updateUIForLevel() {
+            const levelData = gameState.currentLevelData;
+            levelDisplay.textContent = gameState.level;
+            
+            learnPanel.innerHTML = '';
+            levelData.availableGates.forEach(gateType => {
+                const info = GATE_INFO[gateType];
+                const div = document.createElement('div');
+                div.innerHTML = `<strong style="color: ${GATE_DEFS[gateType].color};">${gateType}:</strong> ${info}`;
+                learnPanel.appendChild(div);
+            });
+
+            truthTableContainer.innerHTML = '';
+            if (levelData.truthTable.length > 0) {
+                let tableHtml = '<table class="w-full text-left">';
+                tableHtml += '<thead><tr>';
+                levelData.inputs.forEach(name => tableHtml += `<th class="p-1">${name}</th>`);
+                tableHtml += `<th class="p-1 text-[var(--color-success)]">OUT</th></tr></thead><tbody>`;
+                levelData.truthTable.forEach(row => {
+                    tableHtml += '<tr class="border-t border-zinc-700">';
+                    row.inputs.forEach(val => tableHtml += `<td class="p-1">${val}</td>`);
+                    tableHtml += `<td class="p-1 text-[var(--color-success)]">${row.output}</td>`;
+                    tableHtml += '</tr>';
+                });
+                tableHtml += '</tbody></table>';
+                truthTableContainer.innerHTML = tableHtml;
+            }
+            
+            document.getElementById('challenge-info').textContent = levelData.description;
+        }
+
+        // --- GAME LOGIC ---
+        function startLevel(level) {
+            gameState.mode = 'puzzle';
+            gameState.level = level;
+            gameState.currentLevelData = generateLevel(level);
+            resetLevelState();
+            updateUIForMode();
+            updateCircuit();
+        }
+
+        function startFreeMode() {
+            gameState.mode = 'free';
+            resetLevelState();
+            updateUIForMode();
+            updateCircuit();
+        }
+
+        function startCreatorMode() {
+            gameState.mode = 'creator';
+            resetLevelState();
+            updateUIForMode();
+            generateCreatorTruthTable();
+            updateCircuit();
+        }
+
+        function resetLevelState() {
+            gameState.placedComponents = [];
+            gameState.wires = [];
+            if (gameState.mode === 'puzzle' && gameState.currentLevelData) {
+                gameState.inputValues = Array(gameState.currentLevelData.inputs.length).fill(0);
+            } else {
+                gameState.inputValues = [];
+            }
+            if (gameState.wiringState.ghostWire) {
+                gameState.wiringState.ghostWire.remove();
+            }
+            gameState.wiringState = { isWiring: false, sourceNode: null, ghostWire: null, targetNode: null };
+            updateCircuit();
+        }
+
+        function solveCircuit(circuit, inputs) {
+            const circuitOutputs = {};
+            if (gameState.mode === 'puzzle') {
+                inputs.forEach((val, i) => {
+                    circuitOutputs[`level-in-${i}`] = val;
+                });
+            } else { // Free or Creator
+                 const circuitInputs = circuit.components.filter(c => c.type === 'INPUT');
+                 inputs.forEach((val, i) => {
+                    if (circuitInputs[i]) {
+                        circuitOutputs[circuitInputs[i].id] = val;
+                    }
+                 });
+            }
+
+            const gateQueue = [...circuit.components.filter(c => GATE_DEFS[c.type])];
+            let iterations = 0;
+            const maxIterations = circuit.components.length * circuit.components.length + 5;
+
+            while (gateQueue.length > 0) {
+                if(iterations++ > maxIterations) {
+                    return [0];
+                }
+
+                const gate = gateQueue.shift();
+                const gateDef = GATE_DEFS[gate.type];
+                const gateInputs = [];
+                let allInputsReady = true;
+
+                for (let i = 0; i < gateDef.inputs; i++) {
+                    const inputId = `${gate.id}-in-${i}`;
+                    const wire = circuit.wires.find(w => w.destId === inputId);
+                    if (!wire) {
+                        allInputsReady = false;
+                        break;
+                    }
+                    const sourceId = wire.sourceId.replace('-out', '');
+                    if (circuitOutputs[sourceId] === undefined) {
+                        allInputsReady = false;
+                        break;
+                    }
+                    gateInputs.push(circuitOutputs[sourceId]);
+                }
+
+                if (allInputsReady) {
+                    let output;
+                    const [i1, i2] = gateInputs;
+                    switch(gate.type) {
+                        case 'NOT': output = i1 ? 0 : 1; break;
+                        case 'AND': output = i1 && i2 ? 1 : 0; break;
+                        case 'OR': output = i1 || i2 ? 1 : 0; break;
+                        case 'XOR': output = i1 !== i2 ? 1 : 0; break;
+                        case 'NAND': output = !(i1 && i2) ? 1 : 0; break;
+                        case 'NOR': output = !(i1 || i2) ? 1 : 0; break;
+                    }
+                    circuitOutputs[gate.id] = output;
+                } else {
+                    gateQueue.push(gate);
+                }
+            }
+            
+            const outputs = gameState.mode === 'puzzle' ? [{id: 'level-out-0'}] : circuit.components.filter(c => c.type === 'OUTPUT');
+            const finalValues = [];
+            outputs.forEach((output, i) => {
+                 const finalWire = circuit.wires.find(w => w.destId === `${output.id}-in-0`);
+                 finalValues.push(finalWire ? (circuitOutputs[finalWire.sourceId.replace('-out', '')] || 0) : 0);
+            });
+            return finalValues;
+        }
+
+        function updateCircuit() {
+            const circuitOutputs = {};
+            if (gameState.mode === 'puzzle') {
+                (gameState.inputValues || []).forEach((val, i) => {
+                    circuitOutputs[`level-in-${i}`] = val;
+                });
+            }
+            gameState.placedComponents.forEach(c => {
+                if (c.type === 'INPUT') {
+                    circuitOutputs[c.id] = c.value;
+                }
+            });
+
+            const unresolvedGates = new Set(gameState.placedComponents.filter(c => GATE_DEFS[c.type]).map(g => g.id));
+            let lastUnresolvedCount = -1;
+
+            while (unresolvedGates.size > 0 && unresolvedGates.size !== lastUnresolvedCount) {
+                lastUnresolvedCount = unresolvedGates.size;
+                unresolvedGates.forEach(gateId => {
+                    const gate = gameState.placedComponents.find(g => g.id === gateId);
+                    if (!gate) {
+                        unresolvedGates.delete(gateId);
+                        return;
+                    }
+                    
+                    const gateDef = GATE_DEFS[gate.type];
+                    const gateInputs = [];
+                    let allInputsReady = true;
+
+                    for (let i = 0; i < gateDef.inputs; i++) {
+                        const inputId = `${gate.id}-in-${i}`;
+                        const wire = gameState.wires.find(w => w.destId === inputId);
+                        if (!wire) { allInputsReady = false; break; }
+                        const sourceId = wire.sourceId.replace('-out', '');
+                        if (circuitOutputs[sourceId] === undefined) { allInputsReady = false; break; }
+                        gateInputs.push(circuitOutputs[sourceId]);
+                    }
+
+                    if (allInputsReady) {
+                        let output;
+                        const [i1, i2] = gateInputs;
+                        switch(gate.type) {
+                            case 'NOT': output = i1 ? 0 : 1; break;
+                            case 'AND': output = i1 && i2 ? 1 : 0; break;
+                            case 'OR': output = i1 || i2 ? 1 : 0; break;
+                            case 'XOR': output = i1 !== i2 ? 1 : 0; break;
+                            case 'NAND': output = !(i1 && i2) ? 1 : 0; break;
+                            case 'NOR': output = !(i1 || i2) ? 1 : 0; break;
+                        }
+                        circuitOutputs[gate.id] = output;
+                        unresolvedGates.delete(gateId);
+                    }
+                });
+            }
+
+            gameState.wires.forEach(wire => {
+                const sourceId = wire.sourceId.replace('-out', '');
+                wire.value = circuitOutputs[sourceId] === undefined ? 0 : circuitOutputs[sourceId];
+            });
+
+            if (gameState.mode === 'free') {
+                analyzeCircuitForFreeMode();
+            }
+
+            render();
+        }
+
+        function checkSolution() {
+            const tableToCheck = gameState.mode === 'puzzle' ? gameState.currentLevelData.truthTable : gameState.creatorTruthTable;
+            if (!tableToCheck || tableToCheck.length === 0) {
+                showMessage("No truth table defined to check against.", "warning");
+                return;
+            }
+
+            const circuitInputs = gameState.mode === 'puzzle' 
+                ? gameState.currentLevelData.inputs 
+                : gameState.placedComponents.filter(c => c.type === 'INPUT');
+
+            for (const row of tableToCheck) {
+                const userCircuit = { components: gameState.placedComponents, wires: gameState.wires };
+                const finalValue = solveCircuit(userCircuit, row.inputs)[0];
+
+                if (finalValue !== row.output) {
+                    const inputStr = row.inputs.map((val, i) => `${circuitInputs[i]?.name || `I${i}`}=${val}`).join(', ');
+                    showMessage(`Incorrect for inputs: ${inputStr}. Expected ${row.output}, got ${finalValue}.`, 'danger');
+                    return;
+                }
+            }
+            levelComplete();
+        }
+        
+        function levelComplete() {
+            modal.style.display = 'flex';
+            setTimeout(() => modalContentContainer.classList.add('modal-content'), 10);
+        }
+
+        function showMessage(text, type = 'info') {
+            messageBox.textContent = text;
+            messageBox.className = `absolute bottom-4 left-1/2 -translate-x-1/2 p-3 rounded-lg text-white font-semibold text-center transition-all duration-300 opacity-100 scale-100 shadow-lg`;
+            if (type === 'success') messageBox.classList.add('bg-green-500');
+            else if (type === 'danger') messageBox.classList.add('bg-red-500');
+            else if (type === 'warning') messageBox.classList.add('bg-yellow-500');
+            else messageBox.classList.add('bg-blue-500');
+
+            setTimeout(() => {
+                messageBox.style.opacity = 0;
+                messageBox.style.transform = 'scale(0.9)';
+            }, 3000);
+        }
+
+        // --- EVENT HANDLERS ---
+        function setupEventListeners() {
+            componentPalette.addEventListener('dragstart', e => {
+                if (e.target.classList.contains('component')) {
+                    e.dataTransfer.setData('text/plain', e.target.dataset.componentType);
+                }
+            });
+
+            canvas.addEventListener('dragover', e => e.preventDefault());
+
+            canvas.addEventListener('drop', e => {
+                e.preventDefault();
+                const componentType = e.dataTransfer.getData('text/plain');
+                if (!GATE_DEFS[componentType] && componentType !== 'INPUT' && componentType !== 'OUTPUT') return;
+
+                const pt = new DOMPoint(e.clientX, e.clientY);
+                const svgP = pt.matrixTransform(canvas.getScreenCTM().inverse());
+                
+                const newComponent = {
+                    id: `${componentType.toLowerCase()}-${Date.now()}`,
+                    type: componentType,
+                    x: svgP.x - 45, 
+                    y: svgP.y - 40,
+                };
+
+                if (componentType === 'INPUT') {
+                    newComponent.value = 0;
+                    newComponent.name = 'IN';
+                } else if (componentType === 'OUTPUT') {
+                    newComponent.name = 'OUT';
+                }
+
+                gameState.placedComponents.push(newComponent);
+                updateCircuit();
+            });
+            
+            canvas.addEventListener('mousedown', e => {
+                const target = e.target;
+                const switchGroup = target.closest('.input-switch-group');
+                const connectorElement = target.closest('.connector');
+                const componentElement = target.closest('.component');
+
+                // FIX: Rewrote mousedown logic to be more explicit and prevent event conflicts.
+                // Priority: Switch > Output Connector > Input Connector > Component Drag
+                if (switchGroup) {
+                    const componentId = switchGroup.dataset.componentId;
+                    if (gameState.mode === 'puzzle') {
+                        const inputId = parseInt(componentId.split('-')[2]);
+                        gameState.inputValues[inputId] = gameState.inputValues[inputId] === 1 ? 0 : 1;
+                    } else {
+                        const comp = gameState.placedComponents.find(c => c.id === componentId);
+                        if (comp) comp.value = comp.value === 1 ? 0 : 1;
+                    }
+                    updateCircuit();
+                    return; 
+                }
+
+                if (connectorElement && connectorElement.classList.contains('output-connector')) {
+                    e.stopPropagation();
+                    gameState.dragState.isDragging = false;
+                    gameState.wiringState.isWiring = true;
+                    gameState.wiringState.sourceNode = connectorElement;
+                    
+                    const ghostWire = document.createElementNS(SVG_NS, 'path');
+                    ghostWire.classList.add('wire-ghost');
+                    gameState.wiringState.ghostWire = ghostWire;
+                    canvas.appendChild(ghostWire);
+                    return;
+                }
+
+                if (connectorElement && connectorElement.classList.contains('input-connector')) {
+                    e.stopPropagation();
+                    return;
+                }
+
+                if (componentElement) {
+                    e.stopPropagation();
+                    gameState.wiringState.isWiring = false;
+                    gameState.dragState.isDragging = true;
+                    gameState.dragState.draggedId = componentElement.id;
+                    
+                    const comp = gameState.placedComponents.find(c => c.id === componentElement.id);
+                    if (!comp) {
+                        gameState.dragState.isDragging = false;
+                        return;
+                    }
+                    const pt = new DOMPoint(e.clientX, e.clientY);
+                    const svgP = pt.matrixTransform(canvas.getScreenCTM().inverse());
+
+                    gameState.dragState.offsetX = svgP.x - comp.x;
+                    gameState.dragState.offsetY = svgP.y - comp.y;
+                    deleteZone.style.opacity = '1';
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                if (gameState.wiringState.isWiring) {
+                    const pt = new DOMPoint(e.clientX, e.clientY);
+                    const svgP = pt.matrixTransform(canvas.getScreenCTM().inverse());
+                    const { sourceNode, ghostWire } = gameState.wiringState;
+                    const sourceBbox = sourceNode.getBoundingClientRect();
+                    const canvasBbox = canvas.getBoundingClientRect();
+                    const p1 = { x: sourceBbox.right - canvasBbox.left, y: sourceBbox.top + sourceBbox.height / 2 - canvasBbox.top };
+                    const p2 = { x: svgP.x, y: svgP.y };
+
+                    const pathData = `M ${p1.x} ${p1.y} C ${p1.x + 75} ${p1.y} ${p2.x - 75} ${p2.y} ${p2.x} ${p2.y}`;
+                    ghostWire.setAttribute('d', pathData);
+
+                    const potentialTarget = e.target.closest('.input-connector');
+                    let isValidTarget = potentialTarget && !gameState.wires.some(w => w.destId === potentialTarget.id);
+
+                    if (isValidTarget) {
+                        if (gameState.wiringState.targetNode !== potentialTarget) {
+                            if (gameState.wiringState.targetNode) gameState.wiringState.targetNode.classList.remove('snap-target');
+                            gameState.wiringState.targetNode = potentialTarget;
+                            gameState.wiringState.targetNode.classList.add('snap-target');
+                        }
+                    } else {
+                        if (gameState.wiringState.targetNode) gameState.wiringState.targetNode.classList.remove('snap-target');
+                        gameState.wiringState.targetNode = null;
+                    }
+                    
+                    ghostWire.classList.toggle('wire-ghost-invalid', !gameState.wiringState.targetNode);
+                } else if (gameState.dragState.isDragging) {
+                    const pt = new DOMPoint(e.clientX, e.clientY);
+                    const svgP = pt.matrixTransform(canvas.getScreenCTM().inverse());
+                    const comp = gameState.placedComponents.find(c => c.id === gameState.dragState.draggedId);
+                    if (comp) {
+                        comp.x = svgP.x - gameState.dragState.offsetX;
+                        comp.y = svgP.y - gameState.dragState.offsetY;
+                        
+                        const deleteRect = deleteZone.getBoundingClientRect();
+                        const overDelete = e.clientX >= deleteRect.left && e.clientX <= deleteRect.right &&
+                                         e.clientY >= deleteRect.top && e.clientY <= deleteRect.bottom;
+                        deleteZone.classList.toggle('delete-active', overDelete);
+                        gameState.dragState.overDeleteZone = overDelete;
+
+                        render(); 
+                    }
+                }
+            });
+
+            window.addEventListener('mouseup', e => {
+                if (gameState.wiringState.isWiring) {
+                    const { sourceNode, targetNode } = gameState.wiringState;
+                    if (sourceNode && targetNode) {
+                         gameState.wires.push({ sourceId: sourceNode.id, destId: targetNode.id, value: 0 });
+                    }
+                    
+                    if (targetNode) targetNode.classList.remove('snap-target');
+                    if (gameState.wiringState.ghostWire) gameState.wiringState.ghostWire.remove();
+
+                    gameState.wiringState = { isWiring: false, sourceNode: null, ghostWire: null, targetNode: null };
+                    updateCircuit();
+                } else if (gameState.dragState.isDragging) {
+                    if (gameState.dragState.overDeleteZone) {
+                        const id = gameState.dragState.draggedId;
+                        gameState.placedComponents = gameState.placedComponents.filter(c => c.id !== id);
+                        gameState.wires = gameState.wires.filter(w => !w.sourceId.startsWith(id) && !w.destId.startsWith(id));
+                    }
+                    deleteZone.style.opacity = '0';
+                    deleteZone.classList.remove('delete-active');
+                    gameState.dragState = { isDragging: false, draggedId: null, offsetX: 0, offsetY: 0, overDeleteZone: false };
+                    updateCircuit(); 
+                }
+            });
+
+            puzzleModeBtn.addEventListener('click', () => {
+                if (gameState.mode !== 'puzzle') startLevel(gameState.level);
+            });
+            freeModeBtn.addEventListener('click', () => {
+                if (gameState.mode !== 'free') startFreeMode();
+            });
+            creatorModeBtn.addEventListener('click', () => {
+                if (gameState.mode !== 'creator') startCreatorMode();
+            });
+
+
+            showSolutionBtn.addEventListener('click', () => {
+                const solution = gameState.currentLevelData.solution;
+                if(solution) {
+                    gameState.placedComponents = JSON.parse(JSON.stringify(solution.components));
+                    gameState.wires = JSON.parse(JSON.stringify(solution.wires));
+                    updateCircuit();
+                }
+            });
+
+            checkButton.addEventListener('click', checkSolution);
+            resetButton.addEventListener('click', resetLevelState);
+            nextLevelButton.addEventListener('click', () => {
+                modal.style.display = 'none';
+                modalContentContainer.classList.remove('modal-content');
+                startLevel(gameState.level + 1);
+            });
+
+            creatorInputsSelect.addEventListener('change', generateCreatorTruthTable);
+            creatorTruthTableContainer.addEventListener('click', e => {
+                if (e.target.classList.contains('truth-table-output')) {
+                    const index = parseInt(e.target.dataset.index);
+                    gameState.creatorTruthTable[index].output = gameState.creatorTruthTable[index].output === 1 ? 0 : 1;
+                    generateCreatorTruthTable(parseInt(creatorInputsSelect.value));
+                }
+            });
+            
+            window.addEventListener('resize', updateCircuit);
+        }
+
+        function generateCreatorTruthTable() {
+            const numInputs = parseInt(creatorInputsSelect.value);
+            const inputLabels = ['A', 'B', 'C', 'D'].slice(0, numInputs);
+            const rowCount = Math.pow(2, numInputs);
+            
+            if (gameState.creatorTruthTable.length !== rowCount || gameState.creatorTruthTable[0]?.inputs.length !== numInputs) {
+                gameState.creatorTruthTable = [];
+                for (let i = 0; i < rowCount; i++) {
+                    const inputs = [];
+                    for (let j = numInputs - 1; j >= 0; j--) {
+                        inputs.push((i >> j) & 1);
+                    }
+                    gameState.creatorTruthTable.push({ inputs: inputs, output: 0 });
+                }
+            }
+
+            let tableHtml = '<table class="w-full text-left">';
+            tableHtml += '<thead><tr>';
+            inputLabels.forEach(name => tableHtml += `<th class="p-1">${name}</th>`);
+            tableHtml += `<th class="p-1 text-[var(--color-success)]">OUT</th></tr></thead><tbody>`;
+            gameState.creatorTruthTable.forEach((row, index) => {
+                tableHtml += '<tr class="border-t border-zinc-700">';
+                row.inputs.forEach(val => tableHtml += `<td class="p-1">${val}</td>`);
+                tableHtml += `<td class="p-1 text-center truth-table-output" data-index="${index}">${row.output}</td>`;
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            creatorTruthTableContainer.innerHTML = tableHtml;
+        }
+
+        function analyzeCircuitForFreeMode() {
+            const inputs = gameState.placedComponents.filter(c => c.type === 'INPUT');
+            const outputs = gameState.placedComponents.filter(c => c.type === 'OUTPUT');
+            if (inputs.length === 0 || outputs.length === 0) {
+                analysisTruthTableContainer.innerHTML = '<p class="text-xs">Add at least one Input and one Output to see analysis.</p>';
+                analysisCanonicalForm.innerHTML = '';
+                return;
+            }
+
+            const numInputs = inputs.length;
+            const inputLabels = inputs.map((c, i) => c.name || `I${i}`);
+            const outputLabels = outputs.map((c, i) => c.name || `O${i}`);
+            const truthTable = [];
+
+            for (let i = 0; i < Math.pow(2, numInputs); i++) {
+                const inputValues = [];
+                for (let j = numInputs - 1; j >= 0; j--) {
+                    inputValues.push((i >> j) & 1);
+                }
+                const circuit = { components: gameState.placedComponents, wires: gameState.wires };
+                const inputMap = {};
+                inputs.forEach((c, idx) => { inputMap[c.id] = inputValues[idx]; });
+                
+                const outputValues = solveCircuitForAnalysis(circuit, inputMap);
+                truthTable.push({ inputs: inputValues, outputs: outputValues });
+            }
+
+            // Render Truth Table
+            let tableHtml = '<table class="w-full text-left">';
+            tableHtml += '<thead><tr>';
+            inputLabels.forEach(name => tableHtml += `<th class="p-1">${name}</th>`);
+            outputLabels.forEach(name => tableHtml += `<th class="p-1 text-[var(--color-success)]">${name}</th>`);
+            tableHtml += '</tr></thead><tbody>';
+            truthTable.forEach(row => {
+                tableHtml += '<tr class="border-t border-zinc-700">';
+                row.inputs.forEach(val => tableHtml += `<td class="p-1">${val}</td>`);
+                row.outputs.forEach(val => tableHtml += `<td class="p-1 text-[var(--color-success)]">${val}</td>`);
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            analysisTruthTableContainer.innerHTML = tableHtml;
+
+            // Render Canonical Form (for first output)
+            const minterms = [];
+            truthTable.forEach(row => {
+                if (row.outputs[0] === 1) {
+                    const term = row.inputs.map((val, i) => {
+                        return val === 1 ? inputLabels[i] : `¬${inputLabels[i]}`;
+                    }).join(' ⋅ ');
+                    minterms.push(`(${term})`);
+                }
+            });
+            
+            let canonicalHtml = `<h3 class="text-md font-semibold text-[var(--color-text-strong)]">Canonical Form (SOP)</h3>`;
+            if (minterms.length > 0) {
+                 canonicalHtml += `<p class="font-mono text-xs break-all">${outputLabels[0]} = ${minterms.join(' + ')}</p>`;
+            } else {
+                canonicalHtml += `<p class="font-mono text-xs">${outputLabels[0]} = 0</p>`;
+            }
+            analysisCanonicalForm.innerHTML = canonicalHtml;
+        }
+
+        function solveCircuitForAnalysis(circuit, inputMap) {
+            const circuitOutputs = {...inputMap};
+            const gateQueue = [...circuit.components.filter(c => GATE_DEFS[c.type])];
+            let iterations = 0;
+            const maxIterations = circuit.components.length * circuit.components.length + 5;
+
+            while (gateQueue.length > 0) {
+                if(iterations++ > maxIterations) { return []; }
+                const gate = gateQueue.shift();
+                const gateDef = GATE_DEFS[gate.type];
+                const gateInputs = [];
+                let allInputsReady = true;
+
+                for (let i = 0; i < gateDef.inputs; i++) {
+                    const inputId = `${gate.id}-in-${i}`;
+                    const wire = circuit.wires.find(w => w.destId === inputId);
+                    if (!wire) { allInputsReady = false; break; }
+                    const sourceId = wire.sourceId.replace('-out', '');
+                    if (circuitOutputs[sourceId] === undefined) { allInputsReady = false; break; }
+                    gateInputs.push(circuitOutputs[sourceId]);
+                }
+
+                if (allInputsReady) {
+                    let output;
+                    const [i1, i2] = gateInputs;
+                    switch(gate.type) {
+                        case 'NOT': output = i1 ? 0 : 1; break;
+                        case 'AND': output = i1 && i2 ? 1 : 0; break;
+                        case 'OR': output = i1 || i2 ? 1 : 0; break;
+                        case 'XOR': output = i1 !== i2 ? 1 : 0; break;
+                        case 'NAND': output = !(i1 && i2) ? 1 : 0; break;
+                        case 'NOR': output = !(i1 || i2) ? 1 : 0; break;
+                    }
+                    circuitOutputs[gate.id] = output;
+                } else {
+                    gateQueue.push(gate);
+                }
+            }
+            
+            const outputs = gameState.placedComponents.filter(c => c.type === 'OUTPUT');
+            const finalValues = [];
+            outputs.forEach(output => {
+                const finalWire = circuit.wires.find(w => w.destId === `${output.id}-in-0`);
+                finalValues.push(finalWire ? (circuitOutputs[finalWire.sourceId.replace('-out', '')] || 0) : 0);
+            });
+            return finalValues;
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            startLevel(1);
+        });
+
+    </script>
+</body>
+</html>
